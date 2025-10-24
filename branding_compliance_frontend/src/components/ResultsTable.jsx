@@ -105,6 +105,7 @@ export default function ResultsTable({
           <div style={{ flex: 2 }}>ID</div>
           <div style={{ flex: 4 }}>Issue</div>
           <div style={{ flex: 2 }}>Severity</div>
+          <div style={{ width: 120 }}>Brand</div>
           <div style={{ width: 100, textAlign: "right" }}>Conf.</div>
         </div>
         <div className="col">
@@ -134,6 +135,13 @@ export default function ResultsTable({
                   <span className={`badge ${v.severity === "high" ? "error" : v.severity === "medium" ? "important" : "success"}`}>
                     {v.severity || "unknown"}
                   </span>
+                </div>
+                <div style={{ width: 120 }}>
+                  {v.detectedOldBrand ? (
+                    <span className="badge important" title="Violation triggered by old-brand detection">Old-brand</span>
+                  ) : (
+                    <span className="badge">General</span>
+                  )}
                 </div>
                 <div style={{ width: 100, textAlign: "right" }}>
                   {typeof v.confidence === "number" ? `${Math.round(v.confidence * 100)}%` : "-"}

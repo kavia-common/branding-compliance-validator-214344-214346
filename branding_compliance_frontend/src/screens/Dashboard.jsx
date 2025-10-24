@@ -38,7 +38,7 @@ import DownloadBar from '../components/DownloadBar';
  */
 export default function Dashboard({ user }) {
   // Upload file state (propagated into UploadPanel)
-  const [files, setFiles] = useState({ zip: null, branding: null, guidelines: null });
+  const [files, setFiles] = useState({ zip: null, oldBrand: null, newBrand: null, guidelines: null, intendReplace: false });
 
   // Job info and preview selection
   const [job, setJob] = useState(null);
@@ -190,7 +190,21 @@ export default function Dashboard({ user }) {
                 onSelect={(v) => {
                   // Maintain selected violation and attempt to map to preview list
                   const match = previews.find(p => String(p.id) === String(v.id)) || null;
-                  setPreview(match ? match : { id: v.id, url: '', note: v.issue });
+                  const base = match ? match : { id: v.id, url: '', note: v.issue };
+                  // Surface old-brand flag/regions for PreviewPane to show contextual actions
+                  const enriched = {
+                    ...base,
+                    detectedOldBrand: !!v.detectedOldBrand,
+                    overlays: {
+                      ...(base.overlays || {}),
+                      boxes: [
+                        ...((base.overlays && Array.isArray(base.overlays.boxes)) ? base.overlays.boxes : []),
+                        ...(Array.isArray(v.detectedOldBrandRegions) ? v.detectedOldBrandRegions : []),
+                      ],
+                      detectedOldBrand: !!v.detectedOldBrand,
+                    },
+                  };
+                  setPreview(enriched);
                 }}
               />
             )}

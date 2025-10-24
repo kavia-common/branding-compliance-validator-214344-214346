@@ -261,6 +261,66 @@ export default function PreviewPane({ jobId, selected, user, onPreviewsUpdated, 
               />
             </div>
             <div className="card" style={{ padding: 10 }}>
+              {/* Replace with new brand dedicated action when old-brand detection present */}
+              {(selected?.detectedOldBrand || selected?.overlays?.detectedOldBrand || selected?.note?.toLowerCase?.().includes?.("old-brand")) && (
+                <div className="row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <div className="row" style={{ alignItems: "center", gap: 8 }}>
+                    <span className="badge important">Old-brand detected</span>
+                    <span className="badge">You can request replacement with the new brand</span>
+                  </div>
+                  <button
+                    className="btn secondary"
+                    onClick={async () => {
+                      // PUBLIC_INTERFACE
+                      /**
+                       * Replace with new brand operation
+                       * Purpose: Call /api/v1/jobs/{id}/fixes with operation 'replace_brand'
+                       * GxP Critical: Yes - includes audit metadata.
+                       * Parameters: none
+                       * Returns: void
+                       */
+                      if (!jobId || !selected?.id) return;
+                      if (!reason || reason.trim().length < 3) {
+                        const err = { name: "ValidationError", message: "Please enter a brief reason (min 3 chars).", code: "REASON_REQUIRED" };
+                        setError(err);
+                        onError?.(err);
+                        return;
+                      }
+                      setApplyLoading(true);
+                      setError(null);
+                      try {
+                        const payload = {
+                          operation: "replace_brand",
+                          targetId: selected.id,
+                          parameters: {}, // backend may use job-level new_brand
+                          audit: {
+                            userId,
+                            timestamp: new Date().toISOString(),
+                            action: "APPLY_FIX",
+                            reason: reason.trim(),
+                            signatureId: esign ? String(esign) : undefined,
+                          },
+                        };
+                        const res = await postJson(`/api/v1/jobs/${encodeURIComponent(jobId)}/fixes`, payload, {
+                          retry: { attempts: 1, baseMs: 200, maxMs: 1200 }
+                        });
+                        onApplied?.(res);
+                        await refreshPreviews();
+                      } catch (e) {
+                        const norm = normalizeApiError(e);
+                        setError(norm);
+                        onError?.(norm);
+                      } finally {
+                        setApplyLoading(false);
+                      }
+                    }}
+                    disabled={applyLoading}
+                    aria-label="Replace with new brand"
+                  >
+                    {applyLoading ? "Applying…" : "Replace with new brand"}
+                  </button>
+                </div>
+              )}
               {loading ? (
                 <div className="badge">Loading suggestions…</div>
               ) : suggested.length === 0 ? (

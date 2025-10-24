@@ -56,6 +56,8 @@ export function getApiBaseUrl() {
  * @property {number} [confidence] - Confidence score (0..1).
  * @property {string} [ruleCode] - Internal rule code that triggered the violation.
  * @property {Record<string, any>} [meta] - Additional machine-readable metadata.
+ * @property {boolean} [detectedOldBrand] - True if this violation is due to old brand detection.
+ * @property {Array<{x:number,y:number,w:number,h:number,label?:string,color?:string}>} [detectedOldBrandRegions] - Regions where old brand was detected.
  */
 
 /**
@@ -75,6 +77,8 @@ export function getApiBaseUrl() {
  * @property {string} [createdAt] - ISO timestamp when job was created.
  * @property {string} [updatedAt] - ISO timestamp when job was last updated.
  * @property {string} [requestedBy] - User ID or email who initiated the job.
+ * @property {{filename?:string,mime?:string}} [oldBrand] - Metadata for uploaded old-brand image used for detection.
+ * @property {{filename?:string,mime?:string}} [newBrand] - Metadata for optional new-brand image for replacement.
  */
 
 /**
@@ -83,6 +87,8 @@ export function getApiBaseUrl() {
  * @property {string[]} [includeIds] - Specific violation IDs to include in fixes.
  * @property {Record<string, any>} [parameters] - Additional algorithm parameters for fixes.
  * @property {string} [reason] - Reason for fix request (for audit trails).
+ * @property {('replace_brand'|'custom'|'auto')} [operation] - Operation type; 'replace_brand' replaces old with new brand.
+ * @property {{ userId:string, timestamp:string, action:string, reason?:string, signatureId?:string }} [audit] - Audit fields.
  */
 
 /**

@@ -15,12 +15,13 @@
 /**
  * Max sizes (bytes). Keep conservative defaults; can be adjusted via env if needed later.
  *  - Zip: 200MB
- *  - Branding PNG: 10MB
+ *  - Brand Images (PNG/SVG): 10MB
  *  - Guidelines: 10MB
  */
 const LIMITS = {
   zip: 200 * 1024 * 1024,
-  branding: 10 * 1024 * 1024,
+  oldBrand: 10 * 1024 * 1024,
+  newBrand: 10 * 1024 * 1024,
   guidelines: 10 * 1024 * 1024,
 };
 
@@ -33,7 +34,16 @@ const TYPE_MATCHERS = {
       f.type === "multipart/x-zip";
     return nameOk || mimeOk;
   },
-  branding: (f) => f.type === "image/png" || /\.png$/i.test(f.name || ""),
+  oldBrand: (f) =>
+    f.type === "image/png" ||
+    f.type === "image/svg+xml" ||
+    /\.png$/i.test(f.name || "") ||
+    /\.svg$/i.test(f.name || ""),
+  newBrand: (f) =>
+    f.type === "image/png" ||
+    f.type === "image/svg+xml" ||
+    /\.png$/i.test(f.name || "") ||
+    /\.svg$/i.test(f.name || ""),
   guidelines: (f) =>
     f.type === "application/pdf" ||
     f.type === "text/plain" ||
@@ -46,7 +56,7 @@ const TYPE_MATCHERS = {
  * validateFileType
  * Purpose: Check if a File matches expected type by extension and/or MIME type.
  * Parameters:
- *  - kind: 'zip' | 'branding' | 'guidelines'
+ *  - kind: 'zip' | 'oldBrand' | 'newBrand' | 'guidelines'
  *  - file: File
  * Returns: { ok: boolean, message?: string }
  */
@@ -81,27 +91,37 @@ export function validateFileSize(kind, file) {
  * Purpose: Cross-field validation for the upload payload.
  * GxP Critical: Yes - ensures presence and conformance of all required files
  * Parameters:
- *  - payload: { zip: File|null, branding: File|null, guidelines: File|null }
+ *  - payload: { zip: File|null, oldBrand: File|null, newBrand?: File|null, guidelines: File|null, intendReplace?: boolean }
  * Returns: { ok: boolean, message?: string }
  */
 export function validateUploadPayload(payload) {
-  if (!payload?.zip || !payload?.branding || !payload?.guidelines) {
-    return { ok: false, message: "All files are required: zip, branding PNG, guidelines." };
+  if (!payload?.zip || !payload?.oldBrand || !payload?.guidelines) {
+    return { ok: false, message: "Required: zip, old brand (PNG/SVG), and guidelines." };
   }
 
   // Type checks
   const tZip = validateFileType("zip", payload.zip); if (!tZip.ok) return tZip;
-  const tBrand = validateFileType("branding", payload.branding); if (!tBrand.ok) return tBrand;
+  const tOld = validateFileType("oldBrand", payload.oldBrand); if (!tOld.ok) return tOld;
   const tGuide = validateFileType("guidelines", payload.guidelines); if (!tGuide.ok) return tGuide;
+
+  // If intendReplace is true, newBrand must be present and valid
+  if (payload?.intendReplace) {
+    if (!payload?.newBrand) return { ok: false, message: "New brand image is required when replacement is intended." };
+    const tNew = validateFileType("newBrand", payload.newBrand); if (!tNew.ok) return tNew;
+    const sNew = validateFileSize("newBrand", payload.newBrand); if (!sNew.ok) return sNew;
+  }
 
   // Size checks
   const sZip = validateFileSize("zip", payload.zip); if (!sZip.ok) return sZip;
-  const sBrand = validateFileSize("branding", payload.branding); if (!sBrand.ok) return sBrand;
+  const sOld = validateFileSize("oldBrand", payload.oldBrand); if (!sOld.ok) return sOld;
   const sGuide = validateFileSize("guidelines", payload.guidelines); if (!sGuide.ok) return sGuide;
 
-  // Cross-field rules (example: guidelines must not be the same file as branding; name-based)
-  if (payload.branding?.name && payload.guidelines?.name && payload.branding.name === payload.guidelines.name) {
-    return { ok: false, message: "Branding and guidelines must be different files." };
+  // Cross-field rules (example: brand images and guidelines must be different file names)
+  if (payload.oldBrand?.name && payload.guidelines?.name && payload.oldBrand.name === payload.guidelines.name) {
+    return { ok: false, message: "Old brand and guidelines must be different files." };
+  }
+  if (payload.newBrand?.name && payload.guidelines?.name && payload.newBrand.name === payload.guidelines.name) {
+    return { ok: false, message: "New brand and guidelines must be different files." };
   }
 
   return { ok: true };

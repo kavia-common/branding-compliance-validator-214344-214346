@@ -38,28 +38,39 @@ export function useUploadComplianceJob() {
   const [error, setErr] = useState(null);
   const [jobInfo, setJobInfo] = useState(null);
 
-  const startJob = useCallback(async ({ zip, branding, guidelines }) => {
+  /**
+   * PUBLIC_INTERFACE
+   * startJob
+   * Purpose: Validate and upload multipart form with old/new brand and other files.
+   * GxP Critical: Yes - validation and error normalization.
+   * Parameters:
+   *  - payload: { zip: File|null, oldBrand: File|null, newBrand?: File|null, guidelines: File|null, intendReplace?: boolean }
+   * Returns: Promise<{jobId?: string, status?: string, error?: ApiError}>
+   */
+  const startJob = useCallback(async ({ zip, oldBrand, newBrand, guidelines, intendReplace }) => {
     setErr(null);
     setJobInfo(null);
 
     // Validate inputs
-    const val = validateUploadPayload({ zip, branding, guidelines });
+    const val = validateUploadPayload({ zip, oldBrand, newBrand, guidelines, intendReplace: !!intendReplace });
     if (!val.ok) {
       const norm = normalizeApiError({ name: "ValidationError", message: val.message, code: "VALIDATION_FAILED" });
       setErr(norm);
       return { error: norm };
     }
 
-    // Build form-data
+    // Build form-data with explicit field names expected by backend
     const fd = new FormData();
-    // Field names chosen to match backend expectation "zip", "branding", "guidelines"
     fd.append("zip", zip);
-    fd.append("branding", branding);
+    fd.append("old_brand", oldBrand);
+    if (intendReplace && newBrand) {
+      fd.append("new_brand", newBrand);
+    }
     fd.append("guidelines", guidelines);
+    fd.append("intend_replace", String(!!intendReplace));
 
     setLoading(true);
     try {
-      // POST /api/v1/jobs returns e.g. { id: string, status: 'pending'|'running'|'completed'|'failed' }
       const data = await postMultipart("/api/v1/jobs", fd, {
         retry: { attempts: 2, baseMs: 200, maxMs: 1500 },
       });
