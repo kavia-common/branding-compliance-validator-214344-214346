@@ -21,6 +21,8 @@ import UploadPanel from '../components/UploadPanel';
 import { formatApiError } from '../utils/errorHandling';
 import ResultsTable from '../components/ResultsTable';
 import usePollingJobStatus from '../hooks/usePollingJobStatus';
+import PreviewPane from '../components/PreviewPane';
+import { getJson } from '../api/client';
 
 /**
  * PUBLIC_INTERFACE
@@ -40,6 +42,7 @@ export default function Dashboard({ user }) {
   // Job info and preview selection
   const [job, setJob] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [previews, setPreviews] = useState([]); // previews list cache
   const [notice, setNotice] = useState("");
 
   // Polling hook state bound to job?.id
@@ -69,8 +72,19 @@ export default function Dashboard({ user }) {
     setJob({ id: jobId, status });
     setNotice(`Job started: ${jobId} • status: ${status}`);
     setPreview(null);
+    setPreviews([]);
     // begin polling
     startPolling();
+    // best effort initial fetch of previews
+    (async () => {
+      try {
+        const list = await getJson(`/api/v1/jobs/${encodeURIComponent(jobId)}/previews`, {
+          retry: { attempts: 1, baseMs: 200, maxMs: 1200 }
+        });
+        const arr = Array.isArray(list?.previews) ? list.previews : (Array.isArray(list) ? list : []);
+        setPreviews(arr);
+      } catch { /* optional */ }
+    })();
   };
 
   // Keep job.status synced with hook status for UI text
@@ -86,6 +100,22 @@ export default function Dashboard({ user }) {
       stopPolling();
     }
   }, [isTerminal, stopPolling]);
+
+  // When job is running/completed, try to load previews once if empty
+  useEffect(() => {
+    (async () => {
+      if (!job?.id) return;
+      if ((jobStatus === 'running' || jobStatus === 'completed') && previews.length === 0) {
+        try {
+          const list = await getJson(`/api/v1/jobs/${encodeURIComponent(job.id)}/previews`, {
+            retry: { attempts: 1, baseMs: 200, maxMs: 1200 }
+          });
+          const arr = Array.isArray(list?.previews) ? list.previews : (Array.isArray(list) ? list : []);
+          setPreviews(arr);
+        } catch { /* no-op */ }
+      }
+    })();
+  }, [job?.id, jobStatus, previews.length]);
 
   // Admin bulk placeholder action
   const mockDownload = async () => {
@@ -116,6 +146,11 @@ export default function Dashboard({ user }) {
       )}
 
       {statusBadge}
+      {job?.id && previews?.length > 0 && (
+        <div className="badge" style={{ marginTop: -6 }}>
+          Previews available: {previews.length}
+        </div>
+      )}
 
       {!!pollError && (
         <div className="badge error" style={{ marginTop: 8 }}>
@@ -141,7 +176,11 @@ export default function Dashboard({ user }) {
                 onPageSizeChange={setPageSize}
                 filter={filter}
                 onFilterChange={setFilter}
-                onSelect={(v) => setPreview({ id: v.id, url: '', note: v.issue })}
+                onSelect={(v) => {
+                  // Try to find matching preview by id; otherwise fall back to simple object
+                  const match = previews.find(p => String(p.id) === String(v.id)) || null;
+                  setPreview(match ? match : { id: v.id, url: '', note: v.issue });
+                }}
               />
             )}
 
@@ -158,28 +197,26 @@ export default function Dashboard({ user }) {
         <div className="card" style={{ padding: 16 }}>
           <div className="section-title">Preview</div>
           <div className="col" style={{ marginTop: 10 }}>
-            {preview ? (
-              <div className="col">
-                <div className="badge">Image: {preview.id}</div>
-                <div className="audit-panel" style={{ marginTop: 8 }}>
-                  Audit Trail Placeholder:
-                  <ul>
-                    <li>User: {user?.email || 'demo@user'}</li>
-                    <li>Action: PREVIEW_OPEN</li>
-                    <li>Timestamp: {new Date().toISOString()}</li>
-                    <li>Note: {preview.note}</li>
-                  </ul>
-                </div>
-                <div className="esign-panel" style={{ marginTop: 8 }}>
-                  E-Sign Placeholder: Approval required for final download.
-                </div>
-                <div className="card" style={{ height: 220, marginTop: 10, display: 'grid', placeItems: 'center', color: 'var(--ocn-muted)' }}>
-                  Preview Image Placeholder
-                </div>
-              </div>
-            ) : (
-              <div className="badge">Select a result to preview.</div>
-            )}
+            <PreviewPane
+              jobId={job?.id || null}
+              selected={preview}
+              user={user}
+              onPreviewsUpdated={(list) => {
+                setPreviews(Array.isArray(list) ? list : []);
+                // update selected preview reference if same id exists
+                if (preview?.id) {
+                  const found = (Array.isArray(list) ? list : []).find(p => String(p.id) === String(preview.id));
+                  if (found) setPreview(found);
+                }
+              }}
+              onApplied={() => {
+                // notify success lightweight
+                setNotice(`Fix applied to image ${preview?.id ?? ''}`);
+              }}
+              onError={(e) => {
+                console.warn("PreviewPane error:", e);
+              }}
+            />
           </div>
         </div>
 
