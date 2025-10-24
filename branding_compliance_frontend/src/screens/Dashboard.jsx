@@ -17,6 +17,8 @@
 // ============================================================================
 
 import React, { useState } from 'react';
+import UploadPanel from '../components/UploadPanel';
+import { formatApiError } from '../utils/errorHandling';
 
 /**
  * PUBLIC_INTERFACE
@@ -30,45 +32,18 @@ import React, { useState } from 'react';
  * Audit: Placeholder events for upload and download actions; actual audit logging to be implemented in backend and real auth integration.
  */
 export default function Dashboard({ user }) {
+  // Upload file state (propagated into UploadPanel)
   const [files, setFiles] = useState({ zip: null, branding: null, guidelines: null });
+  // Job and UI states
+  const [job, setJob] = useState(null);
   const [flags, setFlags] = useState([]);
   const [preview, setPreview] = useState(null);
-  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
 
-  const onFile = (key) => (e) => {
-    const file = e.target.files?.[0] ?? null;
-    setFiles((f) => ({ ...f, [key]: file }));
-  };
-
-  const mockProcess = async () => {
-    // Placeholder for API call to backend; include audit/e-sign placeholders.
-    setBusy(true);
-    try {
-      // Audit placeholder: capture action metadata
-      console.debug('AUDIT_PLACEHOLDER', {
-        userId: user?.id || 'demo-user',
-        action: 'PROCESS_UPLOAD',
-        timestamp: new Date().toISOString(),
-        payloadMeta: {
-          zip: files.zip?.name,
-          branding: files.branding?.name,
-          guidelines: files.guidelines?.name,
-        },
-        reason: 'Initial processing run',
-      });
-      // Simulated result set
-      await new Promise((r) => setTimeout(r, 700));
-      setFlags([
-        { id: 'img-001', issue: 'Logo misalignment', severity: 'medium' },
-        { id: 'img-002', issue: 'Color variance beyond tolerance', severity: 'high' },
-      ]);
-      setPreview({ id: 'img-001', url: '', note: 'Sample preview (placeholder)' });
-    } catch (e) {
-      console.error('PROCESS_ERROR', e);
-      alert('Processing failed (placeholder). See console for details.');
-    } finally {
-      setBusy(false);
-    }
+  const onJobStarted = ({ jobId, status }) => {
+    setJob({ id: jobId, status });
+    setNotice(`Job started: ${jobId} • status: ${status}`);
+    // Placeholder: in a later step we will poll /api/v1/jobs/{id} to fetch results
   };
 
   const mockDownload = async () => {
@@ -86,62 +61,41 @@ export default function Dashboard({ user }) {
 
   return (
     <div className="col" style={{ gap: 18 }}>
-      <div className="card" style={{ padding: 16 }}>
-        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-          <div className="section-title">Upload Inputs</div>
-          <span className="badge important">Audit & E-sign placeholders embedded</span>
-        </div>
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginTop: 12 }}>
-          <div className="col">
-            <label className="section-title">Images Zip</label>
-            <input className="input" type="file" accept=".zip" onChange={onFile('zip')} />
-            <small className="badge">Accepted: .zip</small>
-          </div>
-          <div className="col">
-            <label className="section-title">Branding PNG</label>
-            <input className="input" type="file" accept="image/png" onChange={onFile('branding')} />
-            <small className="badge">Accepted: .png</small>
-          </div>
-          <div className="col">
-            <label className="section-title">Guidelines (PDF/TXT)</label>
-            <input className="input" type="file" accept=".pdf,.txt" onChange={onFile('guidelines')} />
-            <small className="badge">Accepted: .pdf, .txt</small>
-          </div>
-        </div>
+      <UploadPanel value={files} onChange={setFiles} onStarted={onJobStarted} />
 
-        <div className="row" style={{ marginTop: 14 }}>
-          <button className="btn" onClick={mockProcess} disabled={busy || !files.zip || !files.branding || !files.guidelines}>
-            {busy ? 'Processing…' : 'Process'}
-          </button>
-          <button className="btn ghost" disabled>
-            Connect Backend (pending)
-          </button>
-          {canAdmin ? (
-            <button className="btn secondary">Admin Bulk Action</button>
-          ) : (
-            <span className="badge">Admin Bulk Action (role-gated)</span>
-          )}
+      {!!notice && (
+        <div className="badge success" style={{ marginTop: -6 }}>
+          {notice}
         </div>
-      </div>
+      )}
 
       <div className="grid grid-3">
         <div className="card" style={{ padding: 16 }}>
           <div className="section-title">Results & Flags</div>
           <div className="col" style={{ marginTop: 10 }}>
-            {flags.length === 0 ? (
-              <div className="badge">No results yet. Run processing to see flags.</div>
-            ) : (
+            {(!job && flags.length === 0) && (
+              <div className="badge">No results yet. Start a job to see flags.</div>
+            )}
+            {(flags.length > 0) && (
               flags.map((f) => (
                 <div key={f.id} className="row" style={{ justifyContent: 'space-between', borderBottom: '1px dashed var(--ocn-border)', padding: '10px 0' }}>
                   <div className="col">
                     <strong>{f.id}</strong>
-                    <span className="badge {`${f.severity === 'high' ? 'error' : 'important'}`}">{f.issue}</span>
+                    <span className={`badge ${f.severity === 'high' ? 'error' : 'important'}`}>{f.issue}</span>
                   </div>
                   <div className="row">
                     <button className="btn ghost" onClick={() => setPreview({ id: f.id, url: '', note: f.issue })}>Preview</button>
                   </div>
                 </div>
               ))
+            )}
+            {job && flags.length === 0 && (
+              <div className="badge">Job {job.id} • {job.status}. Results will appear here once available.</div>
+            )}
+            {canAdmin ? (
+              <button className="btn secondary" style={{ marginTop: 12 }}>Admin Bulk Action</button>
+            ) : (
+              <span className="badge" style={{ marginTop: 12 }}>Admin Bulk Action (role-gated)</span>
             )}
           </div>
         </div>
