@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { getBoolEnv } from "../utils/env";
 
 /**
  * ============================================================================
@@ -89,7 +90,8 @@ export function AuthProvider({ children }) {
     }
   }, [token]);
 
-  const isDemoAuth = String(process?.env?.REACT_APP_DEMO_AUTH ?? "true").toLowerCase() !== "false";
+  // Use env helper: default to true if not set
+  const isDemoAuth = getBoolEnv("REACT_APP_DEMO_AUTH", true);
 
   /**
    * PUBLIC_INTERFACE

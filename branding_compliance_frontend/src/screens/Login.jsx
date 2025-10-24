@@ -1,4 +1,4 @@
-/* Login Screen - Ocean Professional style */
+ /* Login Screen - Ocean Professional style */
 //
 // ============================================================================
 // REQUIREMENT TRACEABILITY
@@ -19,6 +19,7 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAudit } from '../context/AuditContext';
+import { getBoolEnv } from '../utils/env';
 
 /**
  * PUBLIC_INTERFACE
@@ -36,10 +37,8 @@ export default function Login({ onLogin, redirectTo = '/dashboard' }) {
   const { login } = useAuth();
   const { enqueueAudit, flush } = useAudit();
 
-  const isDemoAuth = useMemo(
-    () => String(process?.env?.REACT_APP_DEMO_AUTH ?? "true").toLowerCase() !== "false",
-    []
-  );
+  // Read demo flag via safe helper; default to true
+  const isDemoAuth = useMemo(() => getBoolEnv('REACT_APP_DEMO_AUTH', true), []);
 
   // Fields for email/role mock flow
   const [email, setEmail] = useState('');

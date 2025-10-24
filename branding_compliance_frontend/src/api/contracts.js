@@ -30,11 +30,13 @@
  * - Reads REACT_APP_API_BASE_URL (must be set in .env; orchestrator to provide)
  * - If missing, defaults to same-origin '/api' path for local proxy setups
  */
+import { getEnv } from "../utils/env";
+
 export function getApiBaseUrl() {
   // IMPORTANT: Do not hardcode production URLs; use env var, with local fallback
-  const raw = process?.env?.REACT_APP_API_BASE_URL || "/api";
+  const raw = getEnv("REACT_APP_API_BASE_URL", "/api");
   // normalize: remove trailing slash (but keep protocol slashes)
-  return raw.endsWith("/") ? raw.slice(0, -1) : raw;
+  return typeof raw === "string" && raw.endsWith("/") ? raw.slice(0, -1) : raw;
 }
 
 // ============================================================================
