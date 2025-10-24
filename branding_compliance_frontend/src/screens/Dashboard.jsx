@@ -16,9 +16,11 @@
 // Validation Protocol: VP-FE-003
 // ============================================================================
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import UploadPanel from '../components/UploadPanel';
 import { formatApiError } from '../utils/errorHandling';
+import ResultsTable from '../components/ResultsTable';
+import usePollingJobStatus from '../hooks/usePollingJobStatus';
 
 /**
  * PUBLIC_INTERFACE
@@ -34,20 +36,59 @@ import { formatApiError } from '../utils/errorHandling';
 export default function Dashboard({ user }) {
   // Upload file state (propagated into UploadPanel)
   const [files, setFiles] = useState({ zip: null, branding: null, guidelines: null });
-  // Job and UI states
+
+  // Job info and preview selection
   const [job, setJob] = useState(null);
-  const [flags, setFlags] = useState([]);
   const [preview, setPreview] = useState(null);
   const [notice, setNotice] = useState("");
 
+  // Polling hook state bound to job?.id
+  const {
+    status: jobStatus,
+    isTerminal,
+    violations,
+    totalViolations,
+    loading: pollLoading,
+    error: pollError,
+    page,
+    pageSize,
+    setPage,
+    setPageSize,
+    filter,
+    setFilter,
+    start: startPolling,
+    stop: stopPolling,
+    refreshNow,
+  } = usePollingJobStatus(job?.id || null, { start: false, resultsPageSize: 10 });
+
+  // Derived admin flag
+  const canAdmin = user?.role === 'admin';
+
+  // Start handler from upload panel
   const onJobStarted = ({ jobId, status }) => {
     setJob({ id: jobId, status });
     setNotice(`Job started: ${jobId} • status: ${status}`);
-    // Placeholder: in a later step we will poll /api/v1/jobs/{id} to fetch results
+    setPreview(null);
+    // begin polling
+    startPolling();
   };
 
+  // Keep job.status synced with hook status for UI text
+  useEffect(() => {
+    if (job?.id) {
+      setJob((old) => ({ ...(old || {}), status: jobStatus || old?.status || 'pending' }));
+    }
+  }, [job?.id, jobStatus]);
+
+  // Stop polling automatically if terminal
+  useEffect(() => {
+    if (isTerminal) {
+      stopPolling();
+    }
+  }, [isTerminal, stopPolling]);
+
+  // Admin bulk placeholder action
   const mockDownload = async () => {
-    // Placeholder for e-sign prompt and audit logging
     console.debug('ESIGN_PLACEHOLDER_PROMPT', {
       userId: user?.id || 'demo-user',
       action: 'DOWNLOAD_FIXED_ZIP',
@@ -57,7 +98,12 @@ export default function Dashboard({ user }) {
     alert('E-sign placeholder: In production, capture signature before downloading.');
   };
 
-  const canAdmin = user?.role === 'admin';
+  const statusBadge = useMemo(() => {
+    if (!job?.id) return null;
+    const s = jobStatus || job.status || 'pending';
+    const cls = s === 'failed' ? 'error' : s === 'completed' ? 'success' : 'important';
+    return <div className={`badge ${cls}`}>Job {job.id} • {s}{pollLoading ? ' • updating…' : ''}</div>;
+  }, [job, jobStatus, pollLoading]);
 
   return (
     <div className="col" style={{ gap: 18 }}>
@@ -69,31 +115,40 @@ export default function Dashboard({ user }) {
         </div>
       )}
 
+      {statusBadge}
+
+      {!!pollError && (
+        <div className="badge error" style={{ marginTop: 8 }}>
+          {formatApiError(pollError)}
+        </div>
+      )}
+
       <div className="grid grid-3">
         <div className="card" style={{ padding: 16 }}>
           <div className="section-title">Results & Flags</div>
           <div className="col" style={{ marginTop: 10 }}>
-            {(!job && flags.length === 0) && (
+            {(!job?.id && violations.length === 0) && (
               <div className="badge">No results yet. Start a job to see flags.</div>
             )}
-            {(flags.length > 0) && (
-              flags.map((f) => (
-                <div key={f.id} className="row" style={{ justifyContent: 'space-between', borderBottom: '1px dashed var(--ocn-border)', padding: '10px 0' }}>
-                  <div className="col">
-                    <strong>{f.id}</strong>
-                    <span className={`badge ${f.severity === 'high' ? 'error' : 'important'}`}>{f.issue}</span>
-                  </div>
-                  <div className="row">
-                    <button className="btn ghost" onClick={() => setPreview({ id: f.id, url: '', note: f.issue })}>Preview</button>
-                  </div>
-                </div>
-              ))
+
+            {(job?.id) && (
+              <ResultsTable
+                violations={violations}
+                total={totalViolations}
+                page={page}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+                filter={filter}
+                onFilterChange={setFilter}
+                onSelect={(v) => setPreview({ id: v.id, url: '', note: v.issue })}
+              />
             )}
-            {job && flags.length === 0 && (
-              <div className="badge">Job {job.id} • {job.status}. Results will appear here once available.</div>
-            )}
+
             {canAdmin ? (
-              <button className="btn secondary" style={{ marginTop: 12 }}>Admin Bulk Action</button>
+              <button className="btn secondary" style={{ marginTop: 12 }} onClick={() => refreshNow()}>
+                Admin Bulk Action
+              </button>
             ) : (
               <span className="badge" style={{ marginTop: 12 }}>Admin Bulk Action (role-gated)</span>
             )}
