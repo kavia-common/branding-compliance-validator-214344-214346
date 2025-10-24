@@ -16,7 +16,9 @@
 // ============================================================================
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { useAudit } from '../context/AuditContext';
 
 /**
  * PUBLIC_INTERFACE
@@ -30,27 +32,37 @@ import { useNavigate } from 'react-router-dom';
  */
 export default function Login({ onLogin, redirectTo = '/dashboard' }) {
   const nav = useNavigate();
+  const location = useLocation();
+  const { login } = useAuth();
+  const { enqueueAudit, flush } = useAudit();
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('viewer');
+  const [password, setPassword] = useState('');
   const [err, setErr] = useState('');
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     setErr('');
+    const redir = (location && location.state && location.state.from) ? location.state.from : (redirectTo || '/dashboard');
     if (!email || !email.includes('@')) {
       setErr('Please enter a valid email.');
       return;
     }
-    // Audit placeholder for login
-    console.debug('AUDIT_PLACEHOLDER', {
-      action: 'LOGIN',
-      userEmail: email,
-      role,
-      timestamp: new Date().toISOString(),
-    });
-    const user = { id: `u-${Date.now()}`, email, role };
-    onLogin?.(user);
-    nav(redirectTo, { replace: true });
+    // Basic credential presence check (mock)
+    if ((password || '').length < 3) {
+      setErr('Please enter a password (min 3 characters).');
+      return;
+    }
+    const { user } = login({ email, role });
+    try {
+      enqueueAudit('LOGIN', { userId: user.id, context: { email, role } });
+      // flush in background (non-blocking)
+      setTimeout(() => {
+        try { flush(); } catch {}
+      }, 0);
+    } catch {}
+    // ignore prop onLogin; context controls session now
+    nav(redir, { replace: true });
   };
 
   return (
@@ -69,6 +81,15 @@ export default function Login({ onLogin, redirectTo = '/dashboard' }) {
             value={email}
             placeholder="you@example.com"
             onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+          <label className="section-title" style={{ marginTop: 8 }}>Password</label>
+          <input
+            className="input"
+            type="password"
+            value={password}
+            placeholder="••••••••"
+            onChange={(e) => setPassword(e.target.value)}
             required
           />
           <label className="section-title" style={{ marginTop: 8 }}>Role</label>

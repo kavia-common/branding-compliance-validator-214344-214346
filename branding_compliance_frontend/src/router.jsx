@@ -19,19 +19,8 @@ import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react
 import Dashboard from './screens/Dashboard';
 import Login from './screens/Login';
 import { applyTheme, getInitialTheme, setTheme } from './theme';
-
-// Simple auth mock - replace with real auth integration later
-const useAuth = () => {
-  const [user, setUser] = useState(() => {
-    const raw = localStorage.getItem('auth_user');
-    return raw ? JSON.parse(raw) : null;
-  });
-  const login = (u) => { localStorage.setItem('auth_user', JSON.stringify(u)); setUser(u); };
-  const logout = () => { localStorage.removeItem('auth_user'); setUser(null); };
-  const isAuthenticated = !!user;
-  const role = user?.role || 'viewer';
-  return { user, isAuthenticated, role, login, logout };
-};
+import { useAuth, AuthProvider } from './context/AuthContext';
+import { AuditProvider } from './context/AuditContext';
 
 // PUBLIC_INTERFACE
 export function AppRouter() {
@@ -115,8 +104,12 @@ export function AppRouter() {
 // PUBLIC_INTERFACE
 export function RouterRoot() {
   return (
-    <BrowserRouter>
-      <AppRouter />
-    </BrowserRouter>
+    <AuthProvider>
+      <AuditProvider>
+        <BrowserRouter>
+          <AppRouter />
+        </BrowserRouter>
+      </AuditProvider>
+    </AuthProvider>
   );
 }

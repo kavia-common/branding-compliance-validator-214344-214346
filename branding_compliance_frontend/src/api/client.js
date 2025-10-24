@@ -54,11 +54,12 @@ export function uuidv4() {
  */
 export function getAuthContext() {
   try {
-    const raw = localStorage.getItem("auth_user");
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    const token = parsed?.token; // future integration
-    const userId = parsed?.id || parsed?.email;
+    const rawUser = localStorage.getItem("auth_user");
+    const rawToken = localStorage.getItem("auth_token");
+    if (!rawUser && !rawToken) return {};
+    const parsed = rawUser ? JSON.parse(rawUser) : null;
+    const token = rawToken || parsed?.token || undefined;
+    const userId = parsed?.id || parsed?.email || undefined;
     return { token, userId };
   } catch {
     return {};
