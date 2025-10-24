@@ -23,6 +23,7 @@ import ResultsTable from '../components/ResultsTable';
 import usePollingJobStatus from '../hooks/usePollingJobStatus';
 import PreviewPane from '../components/PreviewPane';
 import { getJson } from '../api/client';
+import DownloadBar from '../components/DownloadBar';
 
 /**
  * PUBLIC_INTERFACE
@@ -126,16 +127,7 @@ export default function Dashboard({ user }) {
     })();
   }, [job?.id, jobStatus, previews.length, previewsLoading]);
 
-  // Admin bulk placeholder action
-  const mockDownload = async () => {
-    console.debug('ESIGN_PLACEHOLDER_PROMPT', {
-      userId: user?.id || 'demo-user',
-      action: 'DOWNLOAD_FIXED_ZIP',
-      timestamp: new Date().toISOString(),
-      note: 'Require e-sign to approve fixes before download.',
-    });
-    alert('E-sign placeholder: In production, capture signature before downloading.');
-  };
+  // No-op: download is handled by DownloadBar with finalize + download flow
 
   const statusBadge = useMemo(() => {
     if (!job?.id) return null;
@@ -242,10 +234,22 @@ export default function Dashboard({ user }) {
         <div className="card" style={{ padding: 16 }}>
           <div className="section-title">Finalize</div>
           <div className="col" style={{ marginTop: 10 }}>
-            <button className="btn" onClick={mockDownload}>Download Fixed Zip</button>
-            <small className="badge important" style={{ marginTop: 8 }}>
-              E-sign required before download (placeholder)
-            </small>
+            {job?.id ? (
+              <DownloadBar
+                jobId={job.id}
+                status={jobStatus || job.status}
+                user={user}
+                onFinalized={() => {
+                  // Surface a friendly notice on finalize
+                  setNotice(`Finalized job ${job.id} for download.`);
+                }}
+                onError={(e) => {
+                  console.warn("DownloadBar error:", e);
+                }}
+              />
+            ) : (
+              <span className="badge">Start a job to enable finalize & download.</span>
+            )}
           </div>
         </div>
       </div>
