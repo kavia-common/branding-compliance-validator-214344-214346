@@ -1,0 +1,174 @@
+/* Ocean Professional Theme - Global Variables and Base UI */
+:root {
+  --ocn-bg: #f9fafb;
+  --ocn-surface: #ffffff;
+  --ocn-text: #111827;
+  --ocn-primary: #3b82f6;
+  --ocn-secondary: #64748b;
+  --ocn-success: #06b6d4;
+  --ocn-error: #EF4444;
+  --ocn-amber: #f59e0b;
+  --ocn-border: rgba(17,24,39,0.08);
+  --ocn-muted: rgba(17,24,39,0.6);
+  --ocn-shadow: rgba(2,6,23,0.06);
+  --ocn-grad-start: rgba(59,130,246,0.10);
+  --ocn-grad-end: #f9fafb;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+    Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', Arial, sans-serif;
+  color: var(--ocn-text);
+  background: radial-gradient(1200px 800px at 20% -10%, var(--ocn-grad-start), transparent),
+    linear-gradient(to bottom right, var(--ocn-grad-start), var(--ocn-grad-end));
+}
+
+/* Layout */
+.ocn-app {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.ocn-nav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--ocn-surface);
+  border-bottom: 1px solid var(--ocn-border);
+  backdrop-filter: blur(6px);
+}
+
+.ocn-nav-inner {
+  margin: 0 auto;
+  max-width: 1200px;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  color: var(--ocn-text);
+}
+
+.brand-badge {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--ocn-primary), var(--ocn-amber));
+  box-shadow: 0 6px 18px var(--ocn-shadow);
+}
+
+.ocn-main {
+  flex: 1;
+  margin: 0 auto;
+  max-width: 1200px;
+  padding: 24px;
+}
+
+.footer {
+  border-top: 1px solid var(--ocn-border);
+  background: var(--ocn-surface);
+  color: var(--ocn-muted);
+  font-size: 13px;
+  padding: 14px 20px;
+}
+
+/* Cards and Surfaces */
+.card {
+  background: var(--ocn-surface);
+  border: 1px solid var(--ocn-border);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px var(--ocn-shadow);
+}
+
+/* Buttons */
+.btn {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--ocn-primary);
+  color: #fff;
+  padding: 10px 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform .12s ease, box-shadow .12s ease, background .12s ease, border-color .12s ease;
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.24);
+}
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn.secondary {
+  background: var(--ocn-secondary);
+  box-shadow: 0 8px 24px rgba(100, 116, 139, 0.24);
+}
+.btn.ghost {
+  background: transparent;
+  color: var(--ocn-text);
+  border-color: var(--ocn-border);
+  box-shadow: none;
+}
+
+/* Inputs */
+.input {
+  width: 100%;
+  border: 1px solid var(--ocn-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--ocn-surface);
+  color: var(--ocn-text);
+  outline: none;
+}
+.input:focus {
+  border-color: var(--ocn-primary);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+}
+
+/* Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  border: 1px solid var(--ocn-border);
+  color: var(--ocn-muted);
+  background: #ffffff;
+}
+.badge.success { color: var(--ocn-success); border-color: rgba(6,182,212,0.25); }
+.badge.error { color: var(--ocn-error); border-color: rgba(239,68,68,0.25); }
+.badge.important { color: var(--ocn-amber); border-color: rgba(245,158,11,0.25); }
+
+/* Utility */
+.row { display: flex; gap: 16px; }
+.col { display: flex; flex-direction: column; gap: 12px; }
+.grid {
+  display: grid;
+  gap: 16px;
+}
+.grid-3 {
+  grid-template-columns: 1.2fr 1fr 0.8fr;
+}
+.section-title {
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--ocn-text);
+}
+
+/* Placeholder panels for GxP prompts */
+.audit-panel, .esign-panel {
+  border: 1px dashed var(--ocn-border);
+  border-radius: 12px;
+  padding: 12px;
+  background: linear-gradient(180deg, rgba(59,130,246,0.04), rgba(255,255,255,0.6));
+  color: var(--ocn-muted);
+}
