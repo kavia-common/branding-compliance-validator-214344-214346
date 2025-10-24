@@ -51,6 +51,21 @@ export default function PreviewPane({ jobId, selected, user, onPreviewsUpdated, 
 
   const userId = useMemo(() => user?.id || user?.email || "unknown-user", [user]);
 
+  // Normalize overlay dimensions if provided as relative (0..1)
+  const mapOverlayBox = (box, naturalW, naturalH) => {
+    const isRelative = box?.x <= 1 && box?.y <= 1 && box?.w <= 1 && box?.h <= 1;
+    if (isRelative && naturalW && naturalH) {
+      return {
+        ...box,
+        x: box.x * naturalW,
+        y: box.y * naturalH,
+        w: box.w * naturalW,
+        h: box.h * naturalH,
+      };
+    }
+    return box;
+  };
+
   // Load suggested fixes for selected preview/violation
   useEffect(() => {
     let mounted = true;
@@ -63,15 +78,12 @@ export default function PreviewPane({ jobId, selected, user, onPreviewsUpdated, 
       setLoading(true);
       setError(null);
       try {
-        // Common patterns: /previews/{id}/fixes or /fixes?suggest_for=...
-        // We'll prefer: GET /api/v1/jobs/{jobId}/previews to get list, which may include suggested; else fallback to /previews/{id}/fixes
-        // First attempt to read suggestions from preview detail endpoint (if exists)
+        // Prefer reading suggestions from preview list if present, else direct endpoint, else fallback defaults
         let fixes = [];
         try {
           const detail = await getJson(`/api/v1/jobs/${encodeURIComponent(jobId)}/previews`, {
             retry: { attempts: 1, baseMs: 200, maxMs: 1200 }
           });
-          // detail could be array; find the selected preview
           const list = Array.isArray(detail?.previews) ? detail.previews : (Array.isArray(detail) ? detail : []);
           const item = list.find(p => String(p.id) === String(selected.id));
           if (item?.suggestedFixes && Array.isArray(item.suggestedFixes)) {
@@ -86,8 +98,8 @@ export default function PreviewPane({ jobId, selected, user, onPreviewsUpdated, 
               retry: { attempts: 1, baseMs: 200, maxMs: 1200 }
             });
             fixes = Array.isArray(direct) ? direct : (Array.isArray(direct?.items) ? direct.items : []);
-          } catch (e) {
-            // If suggestions endpoint not available, represent basic fix types as placeholders
+          } catch {
+            // Local fallback suggestions where backend suggestions are unavailable.
             fixes = [
               { id: "auto-adjust-colors", label: "Auto adjust colors", parameters: { strategy: "color_tolerance" } },
               { id: "apply-brand-watermark", label: "Apply brand watermark", parameters: { opacity: 0.12, position: "bottom-right" } }
@@ -107,6 +119,7 @@ export default function PreviewPane({ jobId, selected, user, onPreviewsUpdated, 
     return () => { mounted = false; };
   }, [jobId, selected?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Refresh previews after applying a fix
   const refreshPreviews = async () => {
     if (!jobId) return;
     try {
@@ -136,15 +149,19 @@ export default function PreviewPane({ jobId, selected, user, onPreviewsUpdated, 
     setError(null);
     try {
       const payload = {
+        // Target preview/violation to fix
         targetId: selected.id,
+        // Fix type/code
         fixId: fix?.id || fix?.code || "custom",
+        // Parameters passed through to backend algorithm
         parameters: fix?.parameters || {},
+        // Audit trail fields (ALCOA+)
         audit: {
           userId,
           timestamp: new Date().toISOString(),
           action: "APPLY_FIX",
           reason: reason.trim(),
-          signatureId: esign ? String(esign) : undefined, // placeholder binding if available
+          signatureId: esign ? String(esign) : undefined, // eSign placeholder when captured
         },
       };
       const res = await postJson(`/api/v1/jobs/${encodeURIComponent(jobId)}/fixes`, payload, {
@@ -162,6 +179,9 @@ export default function PreviewPane({ jobId, selected, user, onPreviewsUpdated, 
   };
 
   const imageUrl = useMemo(() => selected?.url || "", [selected]);
+
+  // We use a natural-size tracker to better render overlays if coordinates are relative.
+  const [naturalSize, setNaturalSize] = useState({ w: 0, h: 0 });
 
   return (
     <div className="col" style={{ gap: 10 }}>
@@ -181,26 +201,36 @@ export default function PreviewPane({ jobId, selected, user, onPreviewsUpdated, 
                   src={imageUrl}
                   alt={`Preview ${selected.id}`}
                   style={{ width: "100%", height: "auto", display: "block", borderRadius: 10 }}
+                  onLoad={(e) => {
+                    try {
+                      const img = e.currentTarget;
+                      setNaturalSize({ w: img.naturalWidth || 0, h: img.naturalHeight || 0 });
+                    } catch { /* ignore */ }
+                  }}
                 />
-                {/* Overlays (simple demo): draw boxes if provided in overlays.boxes = [{x,y,w,h,label,color}] */}
+                {/* Overlays: draw boxes if provided under selected.overlays.boxes 
+                    Accepts absolute (px) or relative (0..1) coordinates. */}
                 {!!selected?.overlays?.boxes && Array.isArray(selected.overlays.boxes) && (
                   <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-                    {selected.overlays.boxes.map((b, idx) => (
-                      <div
-                        key={idx}
-                        title={b.label || "overlay"}
-                        style={{
-                          position: "absolute",
-                          left: b.x,
-                          top: b.y,
-                          width: b.w,
-                          height: b.h,
-                          border: `2px solid ${b.color || "rgba(59,130,246,0.9)"}`,
-                          borderRadius: 6,
-                          boxShadow: "0 0 0 2px rgba(255,255,255,0.6) inset",
-                        }}
-                      />
-                    ))}
+                    {selected.overlays.boxes.map((b, idx) => {
+                      const bx = mapOverlayBox(b, naturalSize.w, naturalSize.h);
+                      return (
+                        <div
+                          key={idx}
+                          title={bx.label || "overlay"}
+                          style={{
+                            position: "absolute",
+                            left: bx.x,
+                            top: bx.y,
+                            width: bx.w,
+                            height: bx.h,
+                            border: `2px solid ${bx.color || "rgba(59,130,246,0.9)"}`,
+                            borderRadius: 6,
+                            boxShadow: "0 0 0 2px rgba(255,255,255,0.6) inset",
+                          }}
+                        />
+                      );
+                    })}
                   </div>
                 )}
               </div>

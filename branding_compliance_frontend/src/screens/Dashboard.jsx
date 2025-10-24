@@ -45,6 +45,10 @@ export default function Dashboard({ user }) {
   const [previews, setPreviews] = useState([]); // previews list cache
   const [notice, setNotice] = useState("");
 
+  // Preview list meta
+  const [previewsLoading, setPreviewsLoading] = useState(false);
+  const [previewsError, setPreviewsError] = useState(null);
+
   // Polling hook state bound to job?.id
   const {
     status: jobStatus,
@@ -67,6 +71,25 @@ export default function Dashboard({ user }) {
   // Derived admin flag
   const canAdmin = user?.role === 'admin';
 
+  const fetchPreviews = async (jid) => {
+    if (!jid) return [];
+    setPreviewsLoading(true);
+    setPreviewsError(null);
+    try {
+      const list = await getJson(`/api/v1/jobs/${encodeURIComponent(jid)}/previews`, {
+        retry: { attempts: 1, baseMs: 200, maxMs: 1200 }
+      });
+      const arr = Array.isArray(list?.previews) ? list.previews : (Array.isArray(list) ? list : []);
+      setPreviews(arr);
+      return arr;
+    } catch (e) {
+      setPreviewsError(e);
+      return [];
+    } finally {
+      setPreviewsLoading(false);
+    }
+  };
+
   // Start handler from upload panel
   const onJobStarted = ({ jobId, status }) => {
     setJob({ id: jobId, status });
@@ -75,16 +98,8 @@ export default function Dashboard({ user }) {
     setPreviews([]);
     // begin polling
     startPolling();
-    // best effort initial fetch of previews
-    (async () => {
-      try {
-        const list = await getJson(`/api/v1/jobs/${encodeURIComponent(jobId)}/previews`, {
-          retry: { attempts: 1, baseMs: 200, maxMs: 1200 }
-        });
-        const arr = Array.isArray(list?.previews) ? list.previews : (Array.isArray(list) ? list : []);
-        setPreviews(arr);
-      } catch { /* optional */ }
-    })();
+    // initial fetch of previews
+    fetchPreviews(jobId);
   };
 
   // Keep job.status synced with hook status for UI text
@@ -105,17 +120,11 @@ export default function Dashboard({ user }) {
   useEffect(() => {
     (async () => {
       if (!job?.id) return;
-      if ((jobStatus === 'running' || jobStatus === 'completed') && previews.length === 0) {
-        try {
-          const list = await getJson(`/api/v1/jobs/${encodeURIComponent(job.id)}/previews`, {
-            retry: { attempts: 1, baseMs: 200, maxMs: 1200 }
-          });
-          const arr = Array.isArray(list?.previews) ? list.previews : (Array.isArray(list) ? list : []);
-          setPreviews(arr);
-        } catch { /* no-op */ }
+      if ((jobStatus === 'running' || jobStatus === 'completed') && previews.length === 0 && !previewsLoading) {
+        await fetchPreviews(job.id);
       }
     })();
-  }, [job?.id, jobStatus, previews.length]);
+  }, [job?.id, jobStatus, previews.length, previewsLoading]);
 
   // Admin bulk placeholder action
   const mockDownload = async () => {
@@ -146,10 +155,20 @@ export default function Dashboard({ user }) {
       )}
 
       {statusBadge}
-      {job?.id && previews?.length > 0 && (
-        <div className="badge" style={{ marginTop: -6 }}>
-          Previews available: {previews.length}
-        </div>
+      {job?.id && (
+        <>
+          {previewsLoading && <div className="badge" style={{ marginTop: -6 }}>Loading previews…</div>}
+          {!previewsLoading && previews?.length > 0 && (
+            <div className="badge" style={{ marginTop: -6 }}>
+              Previews available: {previews.length}
+            </div>
+          )}
+          {!!previewsError && (
+            <div className="badge error" style={{ marginTop: 8 }}>
+              {formatApiError(previewsError)}
+            </div>
+          )}
+        </>
       )}
 
       {!!pollError && (
@@ -177,7 +196,7 @@ export default function Dashboard({ user }) {
                 filter={filter}
                 onFilterChange={setFilter}
                 onSelect={(v) => {
-                  // Try to find matching preview by id; otherwise fall back to simple object
+                  // Maintain selected violation and attempt to map to preview list
                   const match = previews.find(p => String(p.id) === String(v.id)) || null;
                   setPreview(match ? match : { id: v.id, url: '', note: v.issue });
                 }}
